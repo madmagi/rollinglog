@@ -31,10 +31,30 @@ import (
 	"time"
 )
 
+type Config struct {
+	Filepath string
+	Timezone *time.Location
+	Mode     os.FileMode
+	DirMode  os.FileMode
+}
+
 // Create a new io.WriteCloser that targets a rolling log file. Uses path as a
 // template, adding the current date.
 //		data/server.log becomes data/2006/01/2006-01-02/server.log
-func New(tz *time.Location, filepath string, mode os.FileMode, dirmode os.FileMode) io.WriteCloser {
+func New(config Config) io.WriteCloser {
+	if config.Filepath == "" {
+		config.Filepath = "logs/log.log"
+	}
+	if config.Timezone == nil {
+		config.Timezone = time.Local
+	}
+	if config.Mode == 0 {
+		config.Mode = 0600
+	}
+	if config.DirMode == 0 {
+		config.DirMode = 02700
+	}
+
 	chFile := make(chan *os.File)
 	chErr := make(chan error)
 	chClosed := make(chan struct{})
@@ -48,9 +68,9 @@ func New(tz *time.Location, filepath string, mode os.FileMode, dirmode os.FileMo
 			default:
 			}
 
-			now := time.Now().In(tz)
-			p := path.Dir(filepath) + now.Format("/2006/01/2006-01-02/") + path.Base(filepath)
-			if err := os.MkdirAll(path.Dir(p), dirmode); err != nil && !os.IsExist(err) {
+			now := time.Now().In(config.Timezone)
+			p := path.Dir(config.Filepath) + now.Format("/2006/01/2006-01-02/") + path.Base(config.Filepath)
+			if err := os.MkdirAll(path.Dir(p), config.DirMode); err != nil && !os.IsExist(err) {
 				select {
 				case chErr <- err:
 				case <-chClosed:
@@ -58,7 +78,7 @@ func New(tz *time.Location, filepath string, mode os.FileMode, dirmode os.FileMo
 				return
 			}
 
-			f, err := os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, mode)
+			f, err := os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, config.Mode)
 			if err != nil {
 				select {
 				case chErr <- err:
