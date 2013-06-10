@@ -28,7 +28,13 @@ import (
 	"io"
 	"os"
 	"path"
+	"syscall"
 	"time"
+)
+
+const (
+	FlagCaptureStdout = 1 << iota
+	FlagCaptureStderr
 )
 
 type Config struct {
@@ -36,6 +42,7 @@ type Config struct {
 	Timezone *time.Location
 	Mode     os.FileMode
 	DirMode  os.FileMode
+	Flags    uint
 }
 
 // Create a new io.WriteCloser that targets a rolling log file. Uses path as a
@@ -90,6 +97,14 @@ func New(config Config) io.WriteCloser {
 			select {
 			case chFile <- f:
 			case <-chClosed:
+				continue
+			}
+
+			if config.Flags&FlagCaptureStdout != 0 {
+				syscall.Dup2(int(f.Fd()), int(os.Stdout.Fd()))
+			}
+			if config.Flags&FlagCaptureStderr != 0 {
+				syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
 			}
 
 			// wait for tomorrow
