@@ -39,7 +39,6 @@ const (
 
 type Config struct {
 	Filepath string
-	Timezone *time.Location
 	Mode     os.FileMode
 	DirMode  os.FileMode
 	Flags    uint
@@ -51,9 +50,6 @@ type Config struct {
 func New(config Config) io.WriteCloser {
 	if config.Filepath == "" {
 		config.Filepath = "logs/log.log"
-	}
-	if config.Timezone == nil {
-		config.Timezone = time.Local
 	}
 	if config.Mode == 0 {
 		config.Mode = 0600
@@ -75,7 +71,7 @@ func New(config Config) io.WriteCloser {
 			default:
 			}
 
-			now := time.Now().In(config.Timezone)
+			now := time.Now()
 			p := path.Dir(config.Filepath) + now.Format("/2006/01/2006-01-02/") + path.Base(config.Filepath)
 			if err := os.MkdirAll(path.Dir(p), config.DirMode); err != nil && !os.IsExist(err) {
 				select {
