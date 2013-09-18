@@ -97,10 +97,14 @@ func New(config Config) io.WriteCloser {
 			}
 
 			if config.Flags&FlagCaptureStdout != 0 {
-				syscall.Dup2(int(f.Fd()), int(os.Stdout.Fd()))
+				fd, stdout := int(f.Fd()), int(os.Stdout.Fd())
+				syscall.Close(stdout)
+				syscall.Dup2(fd, stdout)
 			}
 			if config.Flags&FlagCaptureStderr != 0 {
-				syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
+				fd, stderr := int(f.Fd()), int(os.Stderr.Fd())
+				syscall.Close(stderr)
+				syscall.Dup2(fd, stderr)
 			}
 
 			// wait for tomorrow
