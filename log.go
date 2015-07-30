@@ -29,6 +29,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"regexp"
 	"syscall"
 	"time"
 )
@@ -38,11 +39,15 @@ const (
 	FlagCaptureStderr
 )
 
+var (
+	pattern = regexp.MustCompile("{.*}")
+)
+
 type Config struct {
-	Filepath string
-	Mode     os.FileMode
-	DirMode  os.FileMode
-	Flags    uint
+	FilepathPattern string
+	Mode            os.FileMode
+	DirMode         os.FileMode
+	Flags           uint
 }
 
 func NewMust(config Config) io.WriteCloser {
@@ -57,8 +62,8 @@ func NewMust(config Config) io.WriteCloser {
 // template, adding the current date.
 //		data/server.log becomes data/2006/01/2006-01-02/server.log
 func New(config Config) (io.WriteCloser, error) {
-	if config.Filepath == "" {
-		config.Filepath = "logs/log.log"
+	if config.FilepathPattern == "" {
+		config.FilepathPattern = "logs/{2006/01/2006-01-02}/log.log"
 	}
 	if config.Mode == 0 {
 		config.Mode = 0600
@@ -81,7 +86,9 @@ func New(config Config) (io.WriteCloser, error) {
 			}
 
 			now := time.Now()
-			p := path.Dir(config.Filepath) + now.Format("/2006/01/2006-01-02/") + path.Base(config.Filepath)
+			p := pattern.ReplaceAllStringFunc(config.FilepathPattern, func(s string) string {
+				return now.Format(s[1 : len(s)-1])
+			})
 			if err := os.MkdirAll(path.Dir(p), config.DirMode); err != nil && !os.IsExist(err) {
 				select {
 				case chErr <- err:
