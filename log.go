@@ -99,12 +99,6 @@ func New(config Config) (io.WriteCloser, error) {
 				return
 			}
 
-			select {
-			case chFile <- f:
-			case <-chClosed:
-				continue
-			}
-
 			if config.Flags&FlagCaptureStdout != 0 {
 				fd, stdout := int(f.Fd()), int(os.Stdout.Fd())
 				syscall.Close(stdout)
@@ -118,16 +112,33 @@ func New(config Config) (io.WriteCloser, error) {
 
 			// wait for tomorrow
 			tomorrow := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
-			time.Sleep(tomorrow.Sub(now))
+
+			timeout := time.After(tomorrow.Sub(now))
+			select {
+			case chFile <- f:
+				// wait for timeout
+				<-timeout
+			case <-chClosed:
+				return
+			case <-timeout:
+				f.Close()
+			}
 		}
 	}()
 
+	var f *os.File
+	select {
+	case f = <-chFile:
+	case err := <-chErr:
+		return nil, err
+	}
+
 	return &rollingFile{
-		f:        <-chFile,
+		f:        f,
 		chFile:   chFile,
 		chErr:    chErr,
 		chClosed: chClosed,
-	}
+	}, nil
 }
 
 type rollingFile struct {
