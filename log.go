@@ -26,6 +26,7 @@ package rollinglog
 
 import (
 	"io"
+	"log"
 	"os"
 	"path"
 	"syscall"
@@ -44,10 +45,18 @@ type Config struct {
 	Flags    uint
 }
 
+func NewMust(config Config) io.WriteCloser {
+	wc, err := New(config)
+	if err != nil {
+		log.Panic("Failed to create log: ", err)
+	}
+	return wc
+}
+
 // Create a new io.WriteCloser that targets a rolling log file. Uses path as a
 // template, adding the current date.
 //		data/server.log becomes data/2006/01/2006-01-02/server.log
-func New(config Config) io.WriteCloser {
+func New(config Config) (io.WriteCloser, error) {
 	if config.Filepath == "" {
 		config.Filepath = "logs/log.log"
 	}
